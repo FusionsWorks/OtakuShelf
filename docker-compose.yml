@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: otaku
+      POSTGRES_PASSWORD: otaku
+      POSTGRES_DB: otakushelf
+    ports:
+      - "5432:5432"
+    volumes:
+      - otakushelf_pgdata:/var/lib/postgresql/data
+
+volumes:
+  otakushelf_pgdata:

@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MediaType {
+  ANIME
+  MANGA
+}
+
+enum LibraryStatus {
+  WATCHING
+  READING
+  COMPLETED
+  PLAN_TO_WATCH
+  PLAN_TO_READ
+  ON_HOLD
+  DROPPED
+}
+
+// --- Auth -------------------------------------------------------------
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  avatarUrl     String?
+  createdAt     DateTime @default(now())
+
+  libraryEntries UserLibraryEntry[]
+  notes          Note[]
+}
+
+// --- Datos EXTERNOS (cacheados de Jikan, compartidos entre usuarios) --
+
+model Title {
+  id            String    @id @default(cuid())
+  externalId    Int       @unique // mal_id de Jikan
+  type          MediaType
+  title         String
+  titleJapanese String?
+  coverUrl      String?
+  synopsis      String?   @db.Text
+  genres        String[]
+  year          Int?
+  totalEpisodes Int?      // anime
+  totalChapters Int?      // manga
+  studioOrAuthor String?
+  externalScore Float?
+  lastSyncedAt  DateTime  @default(now())
+
+  libraryEntries UserLibraryEntry[]
+
+  @@index([type])
+}
+
+// --- Datos PERSONALES (por usuario, nunca mezclados con lo externo) --
+
+model UserLibraryEntry {
+  id          String        @id @default(cuid())
+  userId      String
+  titleId     String
+  status      LibraryStatus
+  progress    Int           @default(0)
+  rating      Int?          // 1-10
+  isFavorite  Boolean       @default(false)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  addedAt     DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title   Title   @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  history ProgressHistory[]
+  notes   Note[]
+
+  @@unique([userId, titleId])
+  @@index([userId, status])
+}
+
+model ProgressHistory {
+  id        String   @id @default(cuid())
+  entryId   String
+  progress  Int
+  recordedAt DateTime @default(now())
+
+  entry UserLibraryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId, recordedAt])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  entryId   String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entry UserLibraryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+}
